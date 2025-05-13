@@ -1,6 +1,6 @@
 # Slideshow Creator
 
-![SamSeen Logo](https://img.shields.io/badge/SamSeen-by%20SamSeen%20Solutions-orange)
+![SamSeen Logo](https://img.shields.io/badge/Slideshow_Creator-by_SamSeen_Solutions-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Python](https://img.shields.io/badge/Python-3.6%2B-blue)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
