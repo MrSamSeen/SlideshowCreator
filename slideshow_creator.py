@@ -90,7 +90,7 @@ def print_success(text):
 
 def print_info(text):
     """Print an info message"""
-    print(f"{Colors.BLUE}ℹ {text}{Colors.ENDC}")
+    print(f"{Colors.YELLOW}ℹ {text}{Colors.ENDC}")
 
 def print_warning(text):
     """Print a warning message"""
@@ -298,15 +298,17 @@ def process_frame(args):
     cx, cy, face_size = face_center[:3]
 
     # For zoom effect, we'll use a transformation matrix that scales from the face center
-    # Always zoom IN toward the face to prevent showing black background
+    # Zoom logic:
+    # - First image: Zooms IN towards the face.
+    # - Second image: Starts zoomed IN on the face, then zooms OUT.
     if is_first_image:
         # For first image, we zoom IN toward the face
         # Start at 1.0 (no zoom) and go to ZOOM_AMOUNT (zoomed in)
         scale = 1.0 + (ZOOM_AMOUNT - 1.0) * zoom_progress
     else:
-        # For second image, we also zoom IN toward the face
-        # Start at 1.0 (no zoom) and go to ZOOM_AMOUNT (zoomed in)
-        scale = 1.0 + (ZOOM_AMOUNT - 1.0) * zoom_progress
+        # For second image, we start zoomed IN and zoom OUT from the face
+        # Start at ZOOM_AMOUNT (zoomed in) and go to 1.0 (no zoom)
+        scale = ZOOM_AMOUNT - (ZOOM_AMOUNT - 1.0) * zoom_progress
 
     # Create the zoom transformation matrix
     # This matrix will scale the image from the face center
@@ -347,9 +349,9 @@ def process_frame(args):
 def create_zoom_transition(img1, img2, face_center1, face_center2):
     """Create a zoom transition between two images with fisheye effect.
 
-    The transition zooms in toward the face in the first image, then
-    zooms in toward the face in the second image. This approach prevents
-    showing any black background that might appear during zoom-out effects.
+    The transition zooms in toward the face in the first image.
+    Then, it switches to the second image, which starts zoomed in on its face
+    and then zooms out to reveal the full second image.
 
     Args:
         img1: First image
@@ -484,8 +486,8 @@ def process_batch(images):
 
         print_info(f"Generating {TOTAL_FRAMES} frames for transition from:")
         print(f"  {Colors.CYAN}➤ {os.path.basename(img_path1)}{Colors.ENDC} → {Colors.CYAN}{os.path.basename(img_path2)}{Colors.ENDC}")
-        print(f"  {Colors.BLUE}• Face in image 1: {face_center1[:3]}{Colors.ENDC}")
-        print(f"  {Colors.BLUE}• Face in image 2: {face_center2[:3]}{Colors.ENDC}")
+        print(f"  {Colors.GREEN}• Face in image 1: {face_center1[:3]}{Colors.ENDC}")
+        print(f"  {Colors.GREEN}• Face in image 2: {face_center2[:3]}{Colors.ENDC}")
 
         # Create zoom transition
         transition_frames = create_zoom_transition(img1, img2, face_center1, face_center2)
@@ -493,7 +495,7 @@ def process_batch(images):
         # Save frames with progress bar
         frame_paths = []
         for frame_idx, frame in enumerate(tqdm(transition_frames,
-                                              desc=f"{Colors.BLUE}Saving frames for transition {i+1}/{len(images)-1}{Colors.ENDC}",
+                                              desc=f"{Colors.GREEN}Saving frames for transition {i+1}/{len(images)-1}{Colors.ENDC}",
                                               unit="frame",
                                               bar_format="{l_bar}%s{bar}%s{r_bar}" % (Colors.GREEN, Colors.ENDC))):
             # Save frame with high quality
@@ -539,7 +541,7 @@ def process_batch(images):
     # Create video using FFmpeg
     output_pattern = os.path.join(OUTPUT_DIR, 'frames', 'frame_%06d.jpg')
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    output_video = os.path.join(OUTPUT_DIR, f'slideshow_{FPS}fps_{timestamp}.mp4')
+    output_video = os.path.join(OUTPUT_DIR, f'VID_{FPS}fps_{timestamp}.mp4')
 
     # Check if frames were generated
     if all_transition_frames:
