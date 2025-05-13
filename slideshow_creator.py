@@ -18,6 +18,7 @@ import math
 import random
 import time
 import shutil
+import mediapipe as mp
 from tqdm import tqdm
 import multiprocessing
 from functools import lru_cache
@@ -33,8 +34,8 @@ MUSIC_DIR = "music"           # Directory containing background music files
 
 # Processing Settings
 NUM_WORKERS = max(1, multiprocessing.cpu_count() - 1)  # Use all but one CPU core
-MAX_IMAGES = 30               # Maximum number of images to process in one batch
-WAIT_TIME = 60                # Time to wait between batches (in seconds)
+MIN_IMAGES = 30               # Minimum number of images required to start a batch
+WAIT_TIME = 60                # Time to wait between checks or batches (in seconds)
 
 # Transition Settings
 FPS = 30                      # Frames per second for the output video
@@ -109,7 +110,7 @@ def print_waiting(text, seconds):
 # ===== FACE DETECTION =====
 
 # MediaPipe setup for face detection
-mp_face_detection = mp.solutions.face_detection
+from mediapipe.python.solutions.face_detection import FaceDetection
 
 # Initialize face detection model once for reuse
 face_detection_model = None
@@ -128,19 +129,28 @@ def detect_face_cached(image_path):
 
     # Initialize the model if not already done
     if face_detection_model is None:
-        face_detection_model = mp_face_detection.FaceDetection(
+        face_detection_model = FaceDetection(
             model_selection=1, min_detection_confidence=0.5)
 
     # Convert the BGR image to RGB and process it
     results = face_detection_model.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
-    # If no faces are detected, return the center of the image
-    if not results.detections:
+    # If results object itself is None (e.g., error in processing)
+    if results is None:
         h, w = image.shape[:2]
-        return (w // 2, h // 2, w // 4, image.shape)  # Default: center with 1/4 width as size
+        # print_warning(f"Face detection processing returned None for image: {image_path}") # Optional
+        return (w // 2, h // 2, w // 4, image.shape)  # Default: center
+
+    # Try to get detections attribute; it might be None if no faces are found
+    detections = getattr(results, 'detections', None)
+
+    # If no detections are found (either attribute missing or detections list is empty/None)
+    if not detections:
+        h, w = image.shape[:2]
+        return (w // 2, h // 2, w // 4, image.shape)  # Default: center
 
     # Get the first (presumably main) face
-    detection = results.detections[0]
+    detection = detections[0]
 
     # Get bounding box
     bbox = detection.location_data.relative_bounding_box
@@ -300,10 +310,10 @@ def process_frame(args):
 
     # Create the zoom transformation matrix
     # This matrix will scale the image from the face center
-    M = np.float32([
+    M = np.array([
         [scale, 0, cx * (1 - scale)],
         [0, scale, cy * (1 - scale)]
-    ])
+    ], dtype=np.float32)
 
     # Apply the zoom transformation
     result = cv2.warpAffine(img, M, (w, h), flags=cv2.INTER_LANCZOS4)
@@ -435,7 +445,7 @@ def process_batch(images):
 
     # Initialize face detection model once
     global face_detection_model
-    face_detection_model = mp_face_detection.FaceDetection(
+    face_detection_model = FaceDetection(
         model_selection=1, min_detection_confidence=0.5)
 
     # Detect faces in all images first
@@ -628,8 +638,8 @@ def process_images():
     # Processing settings
     print(f"{Colors.CYAN}{'PROCESSING SETTINGS'.ljust(30)}{Colors.ENDC}")
     print(f"  {Colors.BLUE}• CPU cores:{Colors.ENDC} {Colors.YELLOW}{NUM_WORKERS}{Colors.ENDC}")
-    print(f"  {Colors.BLUE}• Max images per batch:{Colors.ENDC} {Colors.YELLOW}{MAX_IMAGES}{Colors.ENDC}")
-    print(f"  {Colors.BLUE}• Wait time between batches:{Colors.ENDC} {Colors.YELLOW}{WAIT_TIME} seconds{Colors.ENDC}")
+    print(f"  {Colors.BLUE}• Min images per batch:{Colors.ENDC} {Colors.YELLOW}{MIN_IMAGES}{Colors.ENDC}")
+    print(f"  {Colors.BLUE}• Wait time between checks:{Colors.ENDC} {Colors.YELLOW}{WAIT_TIME} seconds{Colors.ENDC}")
     print(f"{Colors.CYAN}{'─' * config_width}{Colors.ENDC}")
 
     # Transition settings
@@ -675,36 +685,35 @@ def process_images():
             images.extend(glob.glob(os.path.join(INPUT_DIR, ext)))
             images.extend(glob.glob(os.path.join(INPUT_DIR, ext.upper())))
 
-        # Sort images by name
+        # Sort images by name (important for consistent batching)
         images.sort()
 
-        if images:
-            if len(images) >= MAX_IMAGES + 1:  # Need at least MAX_IMAGES+1 for MAX_IMAGES transitions
-                batch_count += 1
-                print_header(f"BATCH #{batch_count}")
-                print_info(f"Processing batch of {MAX_IMAGES+1} images...")
-                batch_images = images[:MAX_IMAGES+1]
-                output_video = process_batch(batch_images)
-                if output_video:
-                    print_success(f"Batch #{batch_count} complete! Video saved to: {os.path.basename(output_video)}")
-                else:
-                    print_error(f"Batch #{batch_count} processing failed.")
-            else:
-                # Process all available images if less than the maximum
-                batch_count += 1
-                print_header(f"BATCH #{batch_count}")
-                print_info(f"Processing all {len(images)} available images...")
-                output_video = process_batch(images)
-                if output_video:
-                    print_success(f"Batch #{batch_count} complete! Video saved to: {os.path.basename(output_video)}")
-                else:
-                    print_error(f"Batch #{batch_count} processing failed.")
+        if len(images) >= MIN_IMAGES:
+            batch_count += 1
+            print_header(f"BATCH #{batch_count}")
+            
+            # Select exactly MIN_IMAGES for this batch
+            images_to_process = images[:MIN_IMAGES]
+            print_info(f"Processing batch of {len(images_to_process)} images (out of {len(images)} available).")
 
-                # Wait for more images
-                print_waiting(f"Waiting for more images", WAIT_TIME)
-        else:
-            print_warning(f"No images found in the input directory.")
-            print_waiting(f"Waiting for images", WAIT_TIME)
+            output_video = process_batch(images_to_process) # process_batch moves these images
+
+            if output_video:
+                print_success(f"Batch #{batch_count} complete! Video saved to: {os.path.basename(output_video)}")
+            else:
+                print_error(f"Batch #{batch_count} processing failed.")
+            # After processing (success or fail), the loop continues to re-evaluate image availability.
+
+        elif images: # Some images found, but less than MIN_IMAGES (and MIN_IMAGES >= 2)
+            if len(images) < 2:
+                print_info(f"Found {len(images)} image. Need at least 2 for a transition, and {MIN_IMAGES} to start a batch.")
+            else: # 2 <= len(images) < MIN_IMAGES
+                print_info(f"Found {len(images)} images. Waiting for at least {MIN_IMAGES} images to start a batch.")
+            print_waiting(f"Checking again in {INPUT_DIR}", WAIT_TIME)
+        
+        else: # No images found
+            print_warning(f"No images found in {INPUT_DIR}.")
+            print_waiting(f"Waiting for images in {INPUT_DIR}", WAIT_TIME)
 
 if __name__ == "__main__":
     try:
