@@ -57,16 +57,17 @@ Slideshow Creator is a Python script that creates smooth zoom transitions betwee
 - math (built-in)
 - random (built-in)
 - time (built-in)
-
-## How to Contribute
+<details>
+<summary>## How to Contribute</summary>
 
 - Fork the repository.
 - Create a new branch for your feature or bug fix.
 - Make your changes and commit them.
 - Push your changes to your fork.
 - Create a pull request to the main repository.
-
-## Additional Information
+</details>
+<details>
+<summary>## Additional Information</summary>
 
 - **Configuration Parameters:** The script uses configuration parameters defined in the script for input/output settings, processing settings, transition settings, effect parameters, video output parameters, and performance parameters.
 - **Terminal Formatting:** The script includes a `Colors` class for terminal colors and functions for printing headers, success messages, info messages, warning messages, error messages, and waiting messages.
@@ -74,3 +75,4 @@ Slideshow Creator is a Python script that creates smooth zoom transitions betwee
 - **Special Effects:** Includes functions for applying fisheye/stretching and radial blur effects.
 - **Transition Creation:** Includes functions for processing frames and creating zoom transitions between images.
 - **Batch Processing:** Includes functions for processing batches of images and creating a video.
+</details>
