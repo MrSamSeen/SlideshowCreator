@@ -5,6 +5,8 @@
 ![Python](https://img.shields.io/badge/Python-3.6%2B-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=for-the-badge)
 
+![SamSeen's GitHub stats](https://github-readme-stats.vercel.app/api?username=MrSamSeen)
+
 ## Description
 
 Slideshow Creator is a Python script that creates smooth zoom transitions between images with face detection. It detects faces in each image, creates transitions by zooming out from the first image and zooming in to the second image, applies special effects during transitions, and combines all frames into a high-quality video with optional background music.
